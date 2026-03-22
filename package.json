@@ -1,0 +1,32 @@
+{
+  "name": "recapreels-backend",
+  "version": "1.0.0",
+  "description": "RecapReels SaaS backend — Node.js + Express + Supabase",
+  "main": "src/server.js",
+  "scripts": {
+     "dev": "nodemon src/server.js",
+  "start": "node src/server.js",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.99.3",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
