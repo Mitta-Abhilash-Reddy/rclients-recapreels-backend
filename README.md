@@ -1,4 +1,4 @@
-# RecapReels — Backend
+# client-RecapReels — Backend
 
 Production-ready Node.js + Express backend for the RecapReels SaaS platform.
 Implements a strict **contract-first** architecture: the DB schema is fully hidden from the frontend.
