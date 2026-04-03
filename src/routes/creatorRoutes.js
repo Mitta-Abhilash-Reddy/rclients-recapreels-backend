@@ -29,5 +29,5 @@ router.post(
   upload.single('file'),
   creatorUpload
 );
-
+// router.post('/creator/otp', authMiddleware, roleMiddleware('creator', 'admin'), require('../controllers/creatorController').submitOtp);
 module.exports = router;

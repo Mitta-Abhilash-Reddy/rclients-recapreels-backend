@@ -212,5 +212,30 @@ async function creatorUpload(req, res) {
     res.status(500).json({ error: 'Upload failed' });
   }
 }
+async function submitOtp(req, res) {
+  try {
+    const { eventId, otpType, otpValue } = req.body;
+    const field = otpType === 'start' ? 'start_otp' : 'end_otp';
+    const timeField = otpType === 'start' ? 'actual_start_time' : 'actual_end_time';
+
+    // Verify OTP matches
+    const { data: otp, error } = await supabase
+      .from('event_otps')
+      .select('*')
+      .eq('event_id', eventId)
+      .single();
+
+    if (error || !otp) return res.status(404).json({ error: 'Event OTP not found' });
+    if (otp[field] !== otpValue) return res.status(400).json({ error: 'Incorrect OTP' });
+
+    // Record the time
+    await supabase.from('event_otps').update({ [timeField]: new Date().toISOString() }).eq('event_id', eventId);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[submitOtp]', err);
+    res.status(500).json({ error: 'OTP verification failed' });
+  }
+}
 
 module.exports = { login, register, getCreatorEvents, creatorUpload };

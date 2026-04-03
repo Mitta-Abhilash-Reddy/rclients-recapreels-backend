@@ -123,6 +123,7 @@ async function deleteEvent(req, res) {
 }
 
 // POST /api/admin/assign-creator
+// POST /api/admin/assign-creator
 async function assignCreator(req, res) {
   try {
     const { creatorId, eventId } = req.body;
@@ -131,11 +132,34 @@ async function assignCreator(req, res) {
       return res.status(400).json({ error: 'creatorId and eventId are required' });
     }
 
-    const { error } = await supabase
+    // 1. Upsert the assignment
+    const { error: assignError } = await supabase
       .from('creator_assignments')
-      .upsert({ creator_id: creatorId, event_id: eventId }, { onConflict: 'creator_id,event_id' });
+      .upsert(
+        { creator_id: creatorId, event_id: eventId },
+        { onConflict: 'creator_id,event_id' }
+      );
+    if (assignError) throw assignError;
 
-    if (error) throw error;
+    // 2. Fetch creator details to update event_poc
+    const { data: creator, error: creatorError } = await supabase
+      .from('users')
+      .select('name, phone')   // make sure your users table has a phone column
+      .eq('id', creatorId)
+      .single();
+
+    if (creatorError || !creator) {
+      return res.status(404).json({ error: 'Creator not found' });
+    }
+
+    // 3. Upsert event_poc so the client dashboard shows the right ROG buddy
+    const { error: pocError } = await supabase
+      .from('event_poc')
+      .upsert(
+        { event_id: eventId, name: creator.name || '', phone: creator.phone || '' },
+        { onConflict: 'event_id' }
+      );
+    if (pocError) throw pocError;
 
     res.json({ success: true });
   } catch (err) {
