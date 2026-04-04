@@ -36,24 +36,14 @@ async function createClient(req, res) {
 async function createEvent(req, res) {
   try {
     const {
-      clientId,
-      name,
-      occasionType,
-      date,
-      status,
-      totalAmount,
-      startTime,
-      endTime,
-      duration,
-      poc,
-      otp,
+      clientId, name, occasionType, date, status,
+      totalAmount, startTime, endTime, duration, poc, otp,
     } = req.body;
 
     if (!clientId || !name || !date) {
       return res.status(400).json({ error: 'clientId, name, and date are required' });
     }
 
-    // Insert event
     const { data: event, error: eventError } = await supabase
       .from('events')
       .insert({
@@ -72,7 +62,6 @@ async function createEvent(req, res) {
 
     if (eventError) throw eventError;
 
-    // Insert POC if provided
     if (poc) {
       await supabase.from('event_poc').insert({
         event_id: event.id,
@@ -81,7 +70,6 @@ async function createEvent(req, res) {
       });
     }
 
-    // Insert OTP if provided
     if (otp) {
       await supabase.from('event_otps').insert({
         event_id: event.id,
@@ -90,7 +78,6 @@ async function createEvent(req, res) {
       });
     }
 
-    // Insert empty event_details
     await supabase.from('event_details').insert({
       event_id: event.id,
       description: '',
@@ -111,10 +98,8 @@ async function createEvent(req, res) {
 async function deleteEvent(req, res) {
   try {
     const { id } = req.params;
-
     const { error } = await supabase.from('events').delete().eq('id', id);
     if (error) throw error;
-
     res.json({ success: true });
   } catch (err) {
     console.error('[deleteEvent]', err);
@@ -122,7 +107,6 @@ async function deleteEvent(req, res) {
   }
 }
 
-// POST /api/admin/assign-creator
 // POST /api/admin/assign-creator
 async function assignCreator(req, res) {
   try {
@@ -132,7 +116,7 @@ async function assignCreator(req, res) {
       return res.status(400).json({ error: 'creatorId and eventId are required' });
     }
 
-    // 1. Upsert the assignment
+    // Upsert the assignment
     const { error: assignError } = await supabase
       .from('creator_assignments')
       .upsert(
@@ -141,10 +125,10 @@ async function assignCreator(req, res) {
       );
     if (assignError) throw assignError;
 
-    // 2. Fetch creator details to update event_poc
+    // Fetch creator details (now includes phone)
     const { data: creator, error: creatorError } = await supabase
       .from('users')
-      .select('name, phone')   // make sure your users table has a phone column
+      .select('name, phone')
       .eq('id', creatorId)
       .single();
 
@@ -152,7 +136,7 @@ async function assignCreator(req, res) {
       return res.status(404).json({ error: 'Creator not found' });
     }
 
-    // 3. Upsert event_poc so the client dashboard shows the right ROG buddy
+    // Upsert event_poc so client dashboard shows the right ROG buddy
     const { error: pocError } = await supabase
       .from('event_poc')
       .upsert(
@@ -161,10 +145,102 @@ async function assignCreator(req, res) {
       );
     if (pocError) throw pocError;
 
-    res.json({ success: true });
+    res.json({ success: true, poc: { name: creator.name, phone: creator.phone } });
   } catch (err) {
     console.error('[assignCreator]', err);
     res.status(500).json({ error: 'Failed to assign creator' });
+  }
+}
+
+// PATCH /api/admin/event/:eventId/poc
+// Manually update POC for an event (change after initial assignment)
+async function updateEventPoc(req, res) {
+  try {
+    const { eventId } = req.params;
+    const { name, phone } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+
+    const { error } = await supabase
+      .from('event_poc')
+      .upsert(
+        { event_id: eventId, name: name.trim(), phone: (phone || '').trim() },
+        { onConflict: 'event_id' }
+      );
+
+    if (error) throw error;
+
+    res.json({ success: true, poc: { name: name.trim(), phone: (phone || '').trim() } });
+  } catch (err) {
+    console.error('[updateEventPoc]', err);
+    res.status(500).json({ error: 'Failed to update POC' });
+  }
+}
+
+// GET /api/admin/event/:eventId/otp
+// Admin can view OTP verification status and actual times
+async function getEventOtpStatus(req, res) {
+  try {
+    const { eventId } = req.params;
+
+    const { data, error } = await supabase
+      .from('event_otps')
+      .select('start_otp, end_otp, start_verified, end_verified, actual_start_time, actual_end_time')
+      .eq('event_id', eventId)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'OTP record not found' });
+    }
+
+    res.json({
+      startOtp: data.start_otp,
+      endOtp: data.end_otp,
+      startVerified: data.start_verified || false,
+      endVerified: data.end_verified || false,
+      actualStartTime: data.actual_start_time || null,
+      actualEndTime: data.actual_end_time || null,
+    });
+  } catch (err) {
+    console.error('[getEventOtpStatus]', err);
+    res.status(500).json({ error: 'Failed to fetch OTP status' });
+  }
+}
+
+// PATCH /api/admin/event/:eventId/otp
+// Admin can reset/update OTPs for an event
+async function updateEventOtp(req, res) {
+  try {
+    const { eventId } = req.params;
+    const { startOtp, endOtp } = req.body;
+
+    if (!startOtp || !endOtp) {
+      return res.status(400).json({ error: 'startOtp and endOtp are required' });
+    }
+
+    const { error } = await supabase
+      .from('event_otps')
+      .upsert(
+        {
+          event_id: eventId,
+          start_otp: startOtp.trim(),
+          end_otp: endOtp.trim(),
+          start_verified: false,
+          end_verified: false,
+          actual_start_time: null,
+          actual_end_time: null,
+        },
+        { onConflict: 'event_id' }
+      );
+
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[updateEventOtp]', err);
+    res.status(500).json({ error: 'Failed to update OTPs' });
   }
 }
 
@@ -309,7 +385,7 @@ async function getCreators(req, res) {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, email, created_at')
+      .select('id, name, email, phone, created_at')
       .eq('role', 'creator')
       .order('created_at', { ascending: false });
 
@@ -319,6 +395,7 @@ async function getCreators(req, res) {
       id: u.id,
       name: u.name,
       email: u.email,
+      phone: u.phone || '',
       createdAt: u.created_at,
     })));
   } catch (err) {
@@ -358,6 +435,9 @@ module.exports = {
   createEvent,
   deleteEvent,
   assignCreator,
+  updateEventPoc,
+  getEventOtpStatus,
+  updateEventOtp,
   adminUpload,
   deleteFile,
   addPayment,

@@ -8,6 +8,9 @@ const {
   createEvent,
   deleteEvent,
   assignCreator,
+  updateEventPoc,
+  getEventOtpStatus,
+  updateEventOtp,
   adminUpload,
   deleteFile,
   addPayment,
@@ -24,15 +27,31 @@ const upload = multer({
 // All admin routes require auth + admin role
 router.use(authMiddleware, roleMiddleware('admin'));
 
+// ─── Clients ──────────────────────────────────────────────────────────────────
 router.get('/clients', getClients);
-router.get('/creators', getCreators);
-router.get('/events', getEvents);
 router.post('/client', createClient);
+
+// ─── Events ───────────────────────────────────────────────────────────────────
+router.get('/events', getEvents);
 router.post('/event', createEvent);
 router.delete('/event/:id', deleteEvent);
+
+// ─── POC management (assign + manual override) ────────────────────────────────
 router.post('/assign-creator', assignCreator);
+router.patch('/event/:eventId/poc', updateEventPoc);
+
+// ─── OTP management ───────────────────────────────────────────────────────────
+router.get('/event/:eventId/otp', getEventOtpStatus);
+router.patch('/event/:eventId/otp', updateEventOtp);
+
+// ─── Creators ─────────────────────────────────────────────────────────────────
+router.get('/creators', getCreators);
+
+// ─── Files ────────────────────────────────────────────────────────────────────
 router.post('/upload', upload.single('file'), adminUpload);
 router.delete('/file/:id', deleteFile);
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
 router.post('/payment', addPayment);
 
 module.exports = router;

@@ -3,18 +3,25 @@ const router = express.Router();
 const multer = require('multer');
 const authMiddleware = require('../middlewares/authMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
-const { login, register, getCreatorEvents, creatorUpload } = require('../controllers/creatorController');
+const {
+  login,
+  register,
+  getCreatorEvents,
+  creatorUpload,
+  submitOtp,
+  getOtpStatus,
+} = require('../controllers/creatorController');
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 200 * 1024 * 1024 }, // 200MB
 });
 
-// Auth (public)
+// ─── Auth (public) ────────────────────────────────────────────────────────────
 router.post('/auth/login', login);
 router.post('/auth/register', register);
 
-// Creator protected routes
+// ─── Creator protected routes ─────────────────────────────────────────────────
 router.get(
   '/creator/events',
   authMiddleware,
@@ -29,5 +36,21 @@ router.post(
   upload.single('file'),
   creatorUpload
 );
-// router.post('/creator/otp', authMiddleware, roleMiddleware('creator', 'admin'), require('../controllers/creatorController').submitOtp);
+
+// OTP verification — creator submits OTP received from client
+router.post(
+  '/creator/otp',
+  authMiddleware,
+  roleMiddleware('creator', 'admin'),
+  submitOtp
+);
+
+// OTP status — creator checks current verification state of an event
+router.get(
+  '/creator/otp-status/:eventId',
+  authMiddleware,
+  roleMiddleware('creator', 'admin'),
+  getOtpStatus
+);
+
 module.exports = router;
